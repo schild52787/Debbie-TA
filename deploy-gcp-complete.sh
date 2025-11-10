@@ -66,12 +66,18 @@ echo ""
 
 # Step 5: Build container
 echo "5️⃣  Building container image..."
-cd backend
 gcloud builds submit \
   --tag gcr.io/$PROJECT_ID/debbie-ta-backend \
   --timeout=20m \
-  --dockerfile=Dockerfile.cloudrun .
-cd ..
+  backend \
+  --config=- <<EOF
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/debbie-ta-backend', '-f', 'Dockerfile.cloudrun', '.']
+    dir: 'backend'
+images:
+  - 'gcr.io/$PROJECT_ID/debbie-ta-backend'
+EOF
 echo "✅ Build complete"
 echo ""
 

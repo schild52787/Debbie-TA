@@ -1,0 +1,38 @@
+# Cloud Build configuration for automated deployments
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/debbie-ta-backend:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/debbie-ta-backend:latest'
+      - '-f'
+      - 'backend/Dockerfile.cloudrun'
+      - 'backend'
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/debbie-ta-backend:$COMMIT_SHA'
+
+  # Deploy web service to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'debbie-ta-web'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/debbie-ta-backend:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/debbie-ta-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/debbie-ta-backend:latest'

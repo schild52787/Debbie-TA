@@ -66,18 +66,22 @@ echo ""
 
 # Step 5: Build container
 echo "5️⃣  Building container image..."
-gcloud builds submit \
-  --tag gcr.io/$PROJECT_ID/debbie-ta-backend \
-  --timeout=20m \
-  backend \
-  --config=- <<EOF
+
+# Create temporary cloudbuild config
+cat > /tmp/cloudbuild-temp.yaml <<'EOFYAML'
 steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/debbie-ta-backend', '-f', 'Dockerfile.cloudrun', '.']
-    dir: 'backend'
 images:
   - 'gcr.io/$PROJECT_ID/debbie-ta-backend'
-EOF
+EOFYAML
+
+gcloud builds submit backend \
+  --timeout=20m \
+  --config=/tmp/cloudbuild-temp.yaml
+
+rm /tmp/cloudbuild-temp.yaml
+
 echo "✅ Build complete"
 echo ""
 
@@ -143,12 +147,10 @@ gcloud run jobs delete debbie-ta-init --region us-central1 --quiet 2>/dev/null |
 gcloud run jobs create debbie-ta-init \
   --image gcr.io/$PROJECT_ID/debbie-ta-backend \
   --region us-central1 \
-  --add-cloudsql-instances $SQL_CONN \
+  --set-cloudsql-instances $SQL_CONN \
   --set-env-vars "DATABASE_URL=postgresql://postgres:ChangeMe123!@/postgres?host=/cloudsql/$SQL_CONN" \
   --set-env-vars "PYTHONPATH=/app" \
-  --command "python" \
-  --args "-c" \
-  --args "from app.database import init_db; init_db()" \
+  --command "python,-c,from app.database import init_db; init_db()" \
   --quiet
 
 echo "⏳ Running database initialization..."

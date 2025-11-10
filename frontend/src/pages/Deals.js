@@ -27,6 +27,8 @@ function Deals() {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [liveSearchMode, setLiveSearchMode] = useState(false);
+  const [dealSource, setDealSource] = useState('database');
   const [filters, setFilters] = useState({
     searchQuery: '',
     origin: '',
@@ -44,9 +46,11 @@ function Deals() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  const fetchDeals = async () => {
+  const fetchDeals = async (useLiveSearch = false) => {
     setLoading(true);
     setError(null);
+    setLiveSearchMode(useLiveSearch);
+
     try {
       const params = new URLSearchParams();
       if (filters.origin) params.append('origin', filters.origin);
@@ -55,8 +59,20 @@ function Deals() {
       if (filters.maxPoints) params.append('max_points', filters.maxPoints);
       if (filters.dealType) params.append('deal_type', filters.dealType);
 
-      const response = await axios.get(`/api/deals/?${params.toString()}`);
-      let filteredDeals = response.data;
+      let response;
+      let filteredDeals;
+
+      if (useLiveSearch) {
+        // Live web search
+        response = await axios.get(`/api/deals/live-search?${params.toString()}`);
+        filteredDeals = response.data.deals || [];
+        setDealSource('live_web_search');
+      } else {
+        // Database search
+        response = await axios.get(`/api/deals/?${params.toString()}`);
+        filteredDeals = response.data;
+        setDealSource('database');
+      }
 
       // Client-side filtering for fields not supported by API
       if (filters.searchQuery) {
@@ -89,6 +105,10 @@ function Deals() {
     setLoading(false);
   };
 
+  const handleLiveSearch = () => {
+    fetchDeals(true);
+  };
+
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
@@ -109,12 +129,27 @@ function Deals() {
   return (
     <Container maxWidth="lg">
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Travel Deals
-        </Typography>
-        <Typography variant="body2" color="textSecondary">
-          Find and filter the best travel deals. Deals are automatically scanned every 12 hours.
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="h4">
+            Travel Deals
+          </Typography>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleLiveSearch}
+            disabled={loading}
+            sx={{ minWidth: 150 }}
+          >
+            {loading && liveSearchMode ? 'Searching Web...' : '🔍 Live Web Search'}
+          </Button>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Typography variant="body2" color="textSecondary">
+            {dealSource === 'live_web_search'
+              ? '🌐 Showing live results from travel websites (The Points Guy, Thrifty Traveler, Secret Flying, Going, Fly4Free)'
+              : 'Showing deals from database. Click "Live Web Search" to fetch the latest deals from travel websites in real-time.'}
+          </Typography>
+        </Box>
       </Box>
 
       {/* Search and Quick Filters */}
@@ -259,13 +294,28 @@ function Deals() {
           </AccordionDetails>
         </Accordion>
 
-        <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-          <Button variant="outlined" onClick={handleClearFilters}>
-            Clear All Filters
-          </Button>
-          <Button variant="contained" onClick={fetchDeals}>
-            Refresh Deals
-          </Button>
+        <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            {liveSearchMode && (
+              <Chip
+                label="🌐 Live Web Results"
+                color="success"
+                size="small"
+                variant="outlined"
+              />
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button variant="outlined" onClick={handleClearFilters}>
+              Clear All Filters
+            </Button>
+            <Button variant="contained" onClick={() => fetchDeals(false)}>
+              Search Database
+            </Button>
+            <Button variant="contained" color="secondary" onClick={handleLiveSearch}>
+              🔍 Live Search
+            </Button>
+          </Box>
         </Box>
       </Paper>
 

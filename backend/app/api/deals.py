@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from app.database import get_db
 from app.models import Deal, DealAlert
+from app.services.rss_service import rss_service
 
 router = APIRouter()
 
@@ -188,3 +189,92 @@ def dismiss_alert(alert_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Alert dismissed"}
+
+
+@router.get("/live-search")
+def live_search_deals(
+    origin: Optional[str] = Query(None, description="Origin airport code"),
+    region: Optional[str] = Query(None, description="Destination region"),
+    max_price: Optional[float] = Query(None, description="Maximum cash price"),
+    max_points: Optional[int] = Query(None, description="Maximum points/miles"),
+    limit: int = Query(50, description="Maximum results to return")
+):
+    """
+    Perform a live web search for travel deals from RSS feeds.
+    This fetches real-time data from multiple travel deal websites.
+    """
+    try:
+        # Fetch all deals from RSS feeds
+        all_entries = rss_service.fetch_all_feeds()
+
+        # Apply filters
+        filtered_deals = []
+        for entry in all_entries:
+            # Skip if no link
+            if not entry.get('link'):
+                continue
+
+            # Filter by origin
+            if origin and entry.get('origin_airport'):
+                if entry['origin_airport'].upper() != origin.upper():
+                    continue
+
+            # Filter by region
+            if region and entry.get('destination_region'):
+                if entry['destination_region'].lower() != region.lower():
+                    continue
+
+            # Filter by max price
+            if max_price is not None and entry.get('price'):
+                if entry['price'] > max_price:
+                    continue
+
+            # Filter by max points
+            if max_points is not None and entry.get('points'):
+                if entry['points'] > max_points:
+                    continue
+
+            # Transform to consistent format
+            deal_data = {
+                'id': hash(entry['link']),  # Generate unique ID from URL
+                'source': entry.get('source_name', 'RSS Feed'),
+                'source_url': entry['link'],
+                'deal_type': entry.get('deal_type', 'flight'),
+                'title': entry['title'],
+                'description': entry['description'],
+                'origin_airport': entry.get('origin_airport'),
+                'destination_airport': entry.get('destination_airport'),
+                'destination_city': entry.get('destination_city'),
+                'destination_region': entry.get('destination_region'),
+                'deal_price': entry.get('price'),
+                'points_required': entry.get('points'),
+                'airline': entry.get('airline'),
+                'travel_class': entry.get('travel_class'),
+                'created_at': entry.get('published_date') or datetime.utcnow(),
+                'status': 'active',
+                'quality_score': None
+            }
+
+            filtered_deals.append(deal_data)
+
+        # Sort by published date (newest first)
+        filtered_deals.sort(
+            key=lambda x: x['created_at'] if x['created_at'] else datetime.min,
+            reverse=True
+        )
+
+        # Apply limit
+        filtered_deals = filtered_deals[:limit]
+
+        return {
+            'count': len(filtered_deals),
+            'source': 'live_web_search',
+            'deals': filtered_deals,
+            'message': f'Found {len(filtered_deals)} live deals from travel websites'
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error performing live search: {str(e)}"
+        )

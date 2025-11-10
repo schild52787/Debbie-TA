@@ -23,18 +23,18 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # Gmail API
-    GMAIL_CLIENT_ID: str
-    GMAIL_CLIENT_SECRET: str
+    GMAIL_CLIENT_ID: Optional[str] = None
+    GMAIL_CLIENT_SECRET: Optional[str] = None
     GMAIL_REFRESH_TOKEN: Optional[str] = None
 
     # Twilio SMS
-    TWILIO_ACCOUNT_SID: str
-    TWILIO_AUTH_TOKEN: str
-    TWILIO_PHONE_NUMBER: str
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_PHONE_NUMBER: Optional[str] = None
 
     # Alert Configuration
-    ALERT_EMAIL: str
-    ALERT_SMS: str
+    ALERT_EMAIL: Optional[str] = None
+    ALERT_SMS: Optional[str] = None
     SECONDARY_EMAIL: Optional[str] = None
     SECONDARY_SMS: Optional[str] = None
 

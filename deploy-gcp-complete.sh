@@ -69,7 +69,8 @@ echo "5️⃣  Building container image..."
 cd backend
 gcloud builds submit \
   --tag gcr.io/$PROJECT_ID/debbie-ta-backend \
-  --timeout=20m .
+  --timeout=20m \
+  --dockerfile=Dockerfile.cloudrun .
 cd ..
 echo "✅ Build complete"
 echo ""
